@@ -65,6 +65,7 @@ class Camera:
     def show_video(self,detectMarkers = False):
         cap = cv2.VideoCapture(self.camera_url())
         aruco_dictionary = Camera._charuco_dict()
+        print("Press q to Quit")
 
         while True:
             ret, frame = cap.read()
@@ -80,44 +81,49 @@ class Camera:
         cap.release()
         cv2.destroyAllWindows()
 
-    def calibrate_with_charuco(self, frame_rate=10, chess_square_length = 0.02, marker_square_length = 0.03, save = None) -> None:
+    def calibrate_with_charuco(self, frame_rate=10, chess_square_length = 0.04, marker_square_length = 0.03, show_markers = True, save = None) -> None:
         if self.calibrated():
-            return None
-        print("Press q to Quit")
+            return (self.camera_matrix(),self.distortion_coeff())
+        
         cap = cv2.VideoCapture(self.camera_url())
         _dict = Camera._charuco_dict()
         board = self._create_charuco_board(chess_square_length,marker_square_length)
         all_corners = []
         all_ids = []
-        frame_id = 0
-        gray = None
 
-        for ii in range(500):
+        for frame_id in range(500):
             ret, frame = cap.read()
             if not ret:
+                print('Cannot read from: '+self.camera_url())
                 break
 
             frame_id += 1
-            cv2.imshow(str(self.camera_url()), frame)
+            corners, ids, _ = cv2.aruco.detectMarkers(frame, _dict)
+            if show_markers:
+                aruco.drawDetectedMarkers(frame,corners,ids)
+            
             if frame_id % frame_rate != 0:
                 continue
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            corners, ids, _ = cv2.aruco.detectMarkers(gray, _dict)
+            
             if corners:
-                res, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(corners, ids, gray, board)
-                if res > 20:
+                res, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(corners, ids, frame, board)
+                if res > 4:
                     all_corners.append(charuco_corners)
                     all_ids.append(charuco_ids)
+                aruco.drawDetectedCornersCharuco(frame,charuco_corners,charuco_ids,(0,0,255))
+                cv2.imshow(str(self.camera_url()), frame)
             
+            cv2.waitKey(1)
             
 
-        _, self.mtx, self.dist, _, _ = cv2.aruco.calibrateCameraCharuco(all_corners, all_ids, board, gray.shape, None, None)
+        _, self.mtx, self.dist, _, _ = cv2.aruco.calibrateCameraCharuco(all_corners, all_ids, board, frame.shape[0:2], None, None)
         cap.release()
         self._calibrated = True
         if save!=None:
             self._save(str(save))
         cv2.destroyAllWindows()
+        return (self.mtx,self.dist)
 
     def _save(self, filename):
         data = {
@@ -131,7 +137,7 @@ class Camera:
         self.mtx = data["mtx"]
         self.dist = data["dist"]
 
-    def _create_charuco_board(self,chess_square_length = 0.02, marker_square_length = 0.03):
+    def _create_charuco_board(self,chess_square_length = 0.04, marker_square_length = 0.03):
         return cv2.aruco.CharucoBoard_create(5, 5, chess_square_length, marker_square_length, Camera._charuco_dict())
     
     def save_charuco_board_to_file(self,filename):
