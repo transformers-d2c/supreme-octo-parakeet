@@ -62,13 +62,31 @@ class Camera:
     #     cap.release()
     #     output.release()
 
+    def show_video(self,detectMarkers = False):
+        cap = cv2.VideoCapture(self.camera_url())
+        aruco_dictionary = Camera._charuco_dict()
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                print('Cannot read from: '+ self.camera_url())
+                break
+            if detectMarkers:
+                corners, ids, _ = aruco.detectMarkers(frame,aruco_dictionary)
+                frame = aruco.drawDetectedMarkers(frame,corners,ids,(0,255,0))
+            cv2.imshow(self.camera_url(),frame)
+            if cv2.waitKey(1) == ord('q'):
+                break
+        cap.release()
+        cv2.destroyAllWindows()
+
     def calibrate_with_charuco(self, frame_rate=10, chess_square_length = 0.02, marker_square_length = 0.03, save = None) -> None:
         if self.calibrated():
             return None
-        
+        print("Press q to Quit")
         cap = cv2.VideoCapture(self.camera_url())
         _dict = Camera._charuco_dict()
-        board = Camera._create_charuco_board(chess_square_length,marker_square_length)
+        board = self._create_charuco_board(chess_square_length,marker_square_length)
         all_corners = []
         all_ids = []
         frame_id = 0
