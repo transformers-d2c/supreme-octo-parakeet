@@ -17,10 +17,6 @@ class Camera:
         self._calibrated = False
         self.cam_url = cam_url
 
-        if Path(self.cam_url).exists():
-            self._load()
-            self._calibrated = True
-
     def calibrated(self) -> bool:
         """ The property is equal true if the camera calibrated """
         return self._calibrated
@@ -30,7 +26,10 @@ class Camera:
 
     def undistort(self, img: Any):
         """ Returns undistorted image. Takes gray scaled image as an input. """
-        return cv.undistort(img, self.mtx, self.dist, None, self.mtx)
+        if self.calibrated():
+            return cv.undistort(img, self.mtx, self.dist, None, self.mtx)
+        else:
+            return None
 
 
     # def detect_charuco_corners(self, video_in: str, video_out: str) -> None:
@@ -64,6 +63,9 @@ class Camera:
     #     output.release()
 
     def calibrate_with_charuco(self, frame_rate=10) -> None:
+        if self.calibrated():
+            return None
+        
         cap = cv.VideoCapture(self.camera_url())
         _dict = Camera._charuco_dict()
         board = Camera._create_charuco_board()
@@ -98,20 +100,22 @@ class Camera:
         self._save()
         cv.destroyAllWindows()
 
-    def _save(self):
+    def _save(self, filename):
         data = {
             "mtx": self.mtx,
             "dist": self.dist,
         }
-        pickle.dump(data, open(self.cam_url, "wb"))
+        pickle.dump(data, open(filename, "wb"))
 
-    def _load(self):
-        data = pickle.load(open(self.cam_url, "rb"))
+    def _load(self,filename):
+        data = pickle.load(open(filename, "rb"))
         self.mtx = data["mtx"]
         self.dist = data["dist"]
 
-    def _create_charuco_board():
-        return cv.aruco.CharucoBoard_create(5, 5, 0.04, .02, Camera._charuco_dict())
+    def _create_charuco_board(self,chess_square_length = 0.02, marker_square_length = 0.03):
+        return cv.aruco.CharucoBoard_create(5, 5, chess_square_length, marker_square_length, Camera._charuco_dict())
+    
+    
 
     def _charuco_dict():
         return cv.aruco.Dictionary_get(cv.aruco.DICT_6X6_250)
