@@ -133,6 +133,7 @@ class Camera:
         pickle.dump(data, open(filename, "wb"))
 
     def _load(self,filename):
+        self._calibrated=True
         data = pickle.load(open(filename, "rb"))
         self.mtx = data["mtx"]
         self.dist = data["dist"]
@@ -158,7 +159,39 @@ class Camera:
             return None
         return self.dist
 
-    
+    def markerpose_cameraframe(self,frame,markerlength):
+        if not self.calibrated():
+            return None
+        else:
+            print("yes")
+            aruco_dictionary = Camera._charuco_dict()
+            corners, ids, _ = aruco.detectMarkers(frame,aruco_dictionary)
+            rvec,tvec,_= cv2.aruco.estimatePoseSingleMarkers(corners,markerlength,self.camera_matrix(),self.distortion_coeff())
+            if rvec is None:
+                print("yes")
+                return [],[]
+            return rvec,tvec
+
+    # def test(self):
+    #     cap=cv2.VideoCapture(self.camera_url())
+    #     while True:
+    #         ret, frame = cap.read()
+    #         if not ret:
+    #             print('Cannot read from: '+ self.camera_url())
+    #             break
+    #         rvecs,tvecs=self.markerpose_cameraframe(frame,0.05)
+    #         for i in range(len(rvecs)):
+    #             frame=aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvecs[i],tvecs[i],0.05)  
+    #         cv2.imshow(self.camera_url(),frame)
+    #         if cv2.waitKey(1) == ord('q'):
+    #             break
+    #     cap.release()
+    #     cv2.destroyAllWindows()
+
+        
+        
+
+
         
         
 
