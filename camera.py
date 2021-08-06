@@ -170,7 +170,7 @@ class Camera:
             if rvec is None:
                 print("yes")
                 return [],[]
-            return rvec,tvec
+            return rvec,tvec, ids
 
     # def test(self):
     #     cap=cv2.VideoCapture(self.camera_url())
@@ -187,6 +187,28 @@ class Camera:
     #             break
     #     cap.release()
     #     cv2.destroyAllWindows()
+    def cameratoglobal(self, frame, markerlength):
+        if not self.calibrated():
+            return None
+        rvecs, tvecs, ids = self.markerpose_cameraframe(frame, markerlength)
+        rmat, _ = cv2.Rodrigues(rvecs)
+        half = markerlength/2
+        lengthmat = np.array([half, half, 0])
+        camc = np.add(np.matmul(rmat, lengthmat), tvecs)
+        n = len(ids)
+        j = 0 
+        k = 0
+        for i in range(n):
+            if ids[i] < 50:
+                j = i
+                k = ids[i]
+                break
+        globalmatrix = matdict[k]
+        ref = camc[j]
+        for i in range(n):
+            camc[i] = np.matmul(np.subtract(camc[i], ref), globalmatrix)
+        return camc, ids
+
 
         
         
@@ -194,8 +216,3 @@ class Camera:
 
         
         
-
-
-
-
-
