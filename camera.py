@@ -31,7 +31,7 @@ class Camera:
         else:
             return None
 
-    def show_video(self, detectMarkers=False, showPoseAxis = False):
+    def show_video(self, detectMarkers=False, showPoseAxis = False, showCharucoPose = False):
         cap = cv2.VideoCapture(self.camera_url())
         aruco_dictionary = Camera._charuco_dict()
         print("Press q to Quit")
@@ -46,9 +46,13 @@ class Camera:
                 frame = aruco.drawDetectedMarkers(
                     frame, corners, ids, (0, 255, 0))
             if showPoseAxis and self.calibrated():
-                rvecs,tvecs,_ = self.markerpose_cameraframe(frame,1)
+                rvecs,tvecs,_ = self.marker_pose_in_camera_frame(frame,1)
                 for rvec,tvec in zip(rvecs,tvecs):
                     frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvec,tvec,1)
+            if showCharucoPose:
+                rvecs,tvecs = self.charuco_pose_in_camera_frame(frame)
+                if(len(rvecs)!=0):
+                    frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvecs,tvecs,3)
             cv2.imshow(self.camera_url(), frame)
             if cv2.waitKey(1) == ord('q'):
                 break
@@ -141,22 +145,39 @@ class Camera:
             return None
         return self.dist
 
-    def markerpose_cameraframe(self, frame, markerlength):
+    def marker_pose_in_camera_frame(self, frame, markerlength = 0.7):
         if not self.calibrated():
             return None
         else:
             aruco_dictionary = Camera._charuco_dict()
-            corners, ids, _ = aruco.detectMarkers(frame, aruco_dictionary)
+            para = aruco.DetectorParameters_create()
+            para.cornerRefinementMethod = aruco.CORNER_REFINE_SUBPIX
+            corners, ids, _ = aruco.detectMarkers(frame, aruco_dictionary,parameters = para)
             rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(
                 corners, markerlength, self.camera_matrix(), self.distortion_coeff())
             if rvec is None:
                 return [], [], []
             return rvec, tvec, ids
 
+    def charuco_pose_in_camera_frame(self,frame):
+        if not self.calibrated():
+            return None
+        else:
+            aruco_dictionary = Camera._charuco_dict()
+            board = self._create_charuco_board(1,0.7)
+            corners, ids, _ = aruco.detectMarkers(frame,aruco_dictionary)
+            if(len(corners)==0):
+                return [],[]
+            _, charucoCorners, charucoIds = aruco.interpolateCornersCharuco(corners,ids,frame,board)
+            _,rvec,tvec = aruco.estimatePoseCharucoBoard(charucoCorners,charucoIds,board,self.camera_matrix(),self.distortion_coeff(),None,None)
+            if rvec is None:
+                return [],[]
+            return rvec,tvec
+
     def cameratoglobal(self, frame, markerlength):
         if not self.calibrated():
             return None
-        rvecs, tvecs, ids = self.markerpose_cameraframe(frame, markerlength)
+        rvecs, tvecs, ids = self.marker_pose_in_camera_frame(frame, markerlength)
         rmat, _ = cv2.Rodrigues(rvecs)
         half = markerlength/2
         lengthmat = np.array([half, half, 0])
