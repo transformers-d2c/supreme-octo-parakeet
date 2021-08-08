@@ -31,7 +31,7 @@ class Camera:
         else:
             return None
 
-    def show_video(self, detectMarkers=False):
+    def show_video(self, detectMarkers=False, showPoseAxis = False):
         cap = cv2.VideoCapture(self.camera_url())
         aruco_dictionary = Camera._charuco_dict()
         print("Press q to Quit")
@@ -45,13 +45,17 @@ class Camera:
                 corners, ids, _ = aruco.detectMarkers(frame, aruco_dictionary)
                 frame = aruco.drawDetectedMarkers(
                     frame, corners, ids, (0, 255, 0))
+            if showPoseAxis and self.calibrated():
+                rvecs,tvecs,_ = self.markerpose_cameraframe(frame,1)
+                for rvec,tvec in zip(rvecs,tvecs):
+                    frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvec,tvec,1)
             cv2.imshow(self.camera_url(), frame)
             if cv2.waitKey(1) == ord('q'):
                 break
         cap.release()
         cv2.destroyAllWindows()
 
-    def calibrate_with_charuco(self, frame_rate=10, chess_square_length=0.04, marker_square_length=0.03, show_markers=True, save=None) -> None:
+    def calibrate_with_charuco(self, frame_rate=50, chess_square_length=1, marker_square_length=0.7, show_markers=True, save=None) -> None:
         if self.calibrated():
             return (self.camera_matrix(), self.distortion_coeff())
 
@@ -62,7 +66,7 @@ class Camera:
         all_corners = []
         all_ids = []
 
-        for frame_id in range(500):
+        for frame_id in range(1500):
             ret, frame = cap.read()
             if not ret:
                 print('Cannot read from: '+self.camera_url())
@@ -84,17 +88,23 @@ class Camera:
                     all_ids.append(charuco_ids)
                 aruco.drawDetectedCornersCharuco(
                     frame, charuco_corners, charuco_ids, (0, 0, 255))
-                cv2.imshow(str(self.camera_url()), frame)
-
+                
+            cv2.imshow(str(self.camera_url()), frame)
             cv2.waitKey(1)
 
-        _, self.mtx, self.dist, _, _ = cv2.aruco.calibrateCameraCharuco(
-            all_corners, all_ids, board, frame.shape[0:2], None, None)
-        cap.release()
+        try:
+            projectionError, self.mtx, self.dist, _, _ = cv2.aruco.calibrateCameraCharuco(
+            all_corners, all_ids, board, frame.shape[0:2], None, None, criteria = (cv2.TERM_CRITERIA_MAX_ITER & cv2.TERM_CRITERIA_EPS,50000,1e-9))
+            print(projectionError)
+        except Exception as e:
+            print(e)
+            return None,None
+        finally:
+            cap.release()
+            cv2.destroyAllWindows()
         self._calibrated = True
-        if save != None:
+        if save != None and self.calibrated():
             self._save(str(save))
-        cv2.destroyAllWindows()
         return (self.mtx, self.dist)
 
     def _save(self, filename):
@@ -110,7 +120,7 @@ class Camera:
         self.mtx = data["mtx"]
         self.dist = data["dist"]
 
-    def _create_charuco_board(self, chess_square_length=0.04, marker_square_length=0.03):
+    def _create_charuco_board(self, chess_square_length=1, marker_square_length=0.7):
         return cv2.aruco.CharucoBoard_create(5, 5, chess_square_length, marker_square_length, Camera._charuco_dict())
 
     def save_charuco_board_to_file(self, filename):
@@ -119,7 +129,7 @@ class Camera:
         cv2.imwrite(filename, img)
 
     def _charuco_dict():
-        return cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
+        return cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
 
     def camera_matrix(self):
         if self._calibrated == False:
@@ -140,7 +150,7 @@ class Camera:
             rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(
                 corners, markerlength, self.camera_matrix(), self.distortion_coeff())
             if rvec is None:
-                return [], []
+                return [], [], []
             return rvec, tvec, ids
 
     def cameratoglobal(self, frame, markerlength):
