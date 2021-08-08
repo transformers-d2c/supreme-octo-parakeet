@@ -1,5 +1,5 @@
 import cv2
-import json
+import pickle
 
 
 def main():
@@ -18,9 +18,8 @@ def main():
         for id in ids:
             img = cv2.aruco.drawMarker(boardDict,id[0],720)
             cv2.imwrite('board/round1/individualmarkers/id'+str(id[0])+'.png',img)
-        with open('board/round1/round1board.json','w') as outp:
-            d = {'markersX':20, 'markersY':10, 'markerLenght':15.24000, 'spacing':1}
-            json.dump(d,outp)
+        with open('board/round1/round1board.pkl','wb') as outp:
+            pickle.dump((20,10,15.2400,1),outp,pickle.HIGHEST_PROTOCOL)
 
 
 

@@ -4,8 +4,7 @@ from cv2 import aruco
 import numpy as np
 from pathlib import Path
 from typing import List, Tuple, Any
-import os
-import glob
+import pickle
 
 
 class Camera:
@@ -16,6 +15,8 @@ class Camera:
         self.dist = None
         self._calibrated = False
         self.cam_url = cam_url
+        self.map = None
+
 
     def calibrated(self) -> bool:
         """ The property is equal true if the camera calibrated """
@@ -123,6 +124,11 @@ class Camera:
         data = pickle.load(open(filename, "rb"))
         self.mtx = data["mtx"]
         self.dist = data["dist"]
+
+    def load_map(self,filename):
+        with open(filename,'rb') as inp:
+            data = pickle.load(inp)
+            self.map = aruco.GridBoard_create(data[0],data[1],data[2],data[3],self._charuco_dict())
 
     def _create_charuco_board(self, chess_square_length=1, marker_square_length=0.7):
         return cv2.aruco.CharucoBoard_create(5, 5, chess_square_length, marker_square_length, Camera._charuco_dict())
