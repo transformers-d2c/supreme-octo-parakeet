@@ -32,7 +32,7 @@ class Camera:
         else:
             return None
 
-    def show_video(self, detectMarkers=False, showPoseAxis = False, showCharucoPose = False):
+    def show_video(self, detectMarkers=False, showPoseAxis = False, showCharucoPose = False, showMapPose = False):
         cap = cv2.VideoCapture(self.camera_url())
         aruco_dictionary = Camera._charuco_dict()
         print("Press q to Quit")
@@ -54,6 +54,10 @@ class Camera:
                 rvecs,tvecs = self.charuco_pose_in_camera_frame(frame)
                 if(len(rvecs)!=0):
                     frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvecs,tvecs,3)
+            if showMapPose:
+                rvec,tvec = self.map_pose_in_camera_frame(frame,None,None,True)
+                if len(rvec)>0:
+                    frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvec,tvec,30)
             cv2.imshow(self.camera_url(), frame)
             if cv2.waitKey(1) == ord('q'):
                 break
@@ -128,7 +132,7 @@ class Camera:
     def load_map(self,filename):
         with open(filename,'rb') as inp:
             data = pickle.load(inp)
-            self.map = aruco.GridBoard_create(data[0],data[1],data[2],data[3],self._charuco_dict())
+            self.map = aruco.GridBoard_create(data[0],data[1],data[2],data[3],Camera._charuco_dict())
 
     def _create_charuco_board(self, chess_square_length=1, marker_square_length=0.7):
         return cv2.aruco.CharucoBoard_create(5, 5, chess_square_length, marker_square_length, Camera._charuco_dict())
@@ -180,24 +184,15 @@ class Camera:
                 return [],[]
             return rvec,tvec
 
-    def cameratoglobal(self, frame, markerlength):
-        if not self.calibrated():
-            return None
-        rvecs, tvecs, ids = self.marker_pose_in_camera_frame(frame, markerlength)
-        rmat, _ = cv2.Rodrigues(rvecs)
-        half = markerlength/2
-        lengthmat = np.array([half, half, 0])
-        camc = np.add(np.matmul(rmat, lengthmat), tvecs)
-        n = len(ids)
-        j = 0
-        k = 0
-        for i in range(n):
-            if ids[i] < 50:
-                j = i
-                k = ids[i]
-                break
-        globalmatrix = matdict[k]
-        ref = camc[j]
-        for i in range(n):
-            camc[i] = np.matmul(np.subtract(camc[i], ref), globalmatrix)
-        return camc, ids
+
+    def map_pose_in_camera_frame(self,frame,corners,ids,useFrame = False):
+        if not self.map:
+            return [],[]
+        if useFrame:
+            corners,ids,_ = aruco.detectMarkers(frame,Camera._charuco_dict())
+        
+        if ids is not None and len(ids)>0:
+            ret,rvec,tvec = aruco.estimatePoseBoard(corners,ids,self.map,self.camera_matrix(),self.distortion_coeff(),None,None)
+            if ret>0:
+                return rvec,tvec
+        return [],[]
