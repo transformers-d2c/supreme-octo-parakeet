@@ -4,6 +4,7 @@ from cv2 import aruco
 import pickle
 import time
 from threading import Thread
+import numpy as np
 
 class Camera:
     """ The class implements the camera. """
@@ -17,6 +18,7 @@ class Camera:
         self.video = self.VideoGet(cam_url)
 
     def get_frame(self):
+        """ If new thread is started then wait until frame is available and then return it. """
         if self.video.stopped:
             print('Cannot read frame')
         else:
@@ -39,6 +41,15 @@ class Camera:
             return None
 
     def show_video(self, detectMarkers=False, showPoseAxis = False, showCharucoPose = False, showMapPose = False):
+        """
+        Show video.
+
+        Parameters:
+            detectMarkers(bool): If true it will detect and draw border around markers
+            showPoseAxis(bool): If true it will show pose axis for each detected marker
+            showCharucoPose(bool): If treu it will show pose for detected chatuco board
+            showMapPose(bool): If true it will show pose for the map
+        """
         self.video.start()
         aruco_dictionary = Camera._charuco_dict()
         print("Press q to Quit")
@@ -167,6 +178,9 @@ class Camera:
         return self.dist
 
     def marker_pose_in_camera_frame(self, frame, markerlength = 0.7):
+        """
+        Returns rvec and tvec for detected markers.
+        """
         if not self.calibrated():
             return None
         else:
@@ -181,6 +195,9 @@ class Camera:
             return rvec, tvec, ids
 
     def charuco_pose_in_camera_frame(self,frame):
+        """
+        Returns rvec and tvec for charuco board.
+        """
         if not self.calibrated():
             return None
         else:
@@ -197,6 +214,9 @@ class Camera:
 
 
     def map_pose_in_camera_frame(self,frame,corners,ids,useFrame = False):
+        """
+        Returns rvec and tvec for map.
+        """
         if not self.map:
             return [],[]
         if useFrame:
@@ -233,6 +253,11 @@ class Camera:
         return camc2, ids2
 
     class VideoGet:
+        """
+        Creates a separate thread for reading video frames.
+        Read self.frame to get the video frame
+        """
+
         def __init__(self,src = 0):
             self.grabbed = False
             self.frame = None
@@ -242,6 +267,9 @@ class Camera:
             self.src = src
         
         def start(self):
+            """
+            Starts the new thread.
+            """
             if not self.stopped:
                 return
             self.video_stream = cv2.VideoCapture(self.src)
@@ -257,6 +285,9 @@ class Camera:
                     self.stop()
                 
         def stop(self):
+            """
+            Stops the thread.
+            """
             self.stopped = True
             self.thread.join()
             self.thread = None
