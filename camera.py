@@ -207,6 +207,30 @@ class Camera:
             if ret>0:
                 return rvec,tvec
         return [],[]
+    
+    def cord_rel_to_marker(self, frame, markerlength=0.7):
+        corners, ids, _ = aruco.detectMarkers(frame, Camera._charuco_dict())
+        r, t = self.map_pose_in_camera_frame(frame, corners, ids)
+        if (r, t) == ([], []):
+            return [], []
+        rvec, tvec, ids = self.marker_pose_in_camera_frame(frame, markerlength)
+        rvec2 = []
+        tvec2 = []
+        ids2 = []
+        n = len(ids)
+        for i in range(n):
+            if ids[i] > 200:
+                rvec2.append(rvec[i])
+                tvec2.append(tvec[i])
+                ids2.append((ids[i]))
+        rmat1, _ = cv2.Rodrigues(r)
+        camc1 = np.negative(np.matmul(np.linalg.inv(rmat1), t))
+        rmat2, _ = cv2.Rodrigues(rvec2)
+        camc2 = np.negative(np.matmul(np.linalg.inv(rmat2), tvec2))
+        n = len(camc2)
+        for i in range(n):
+            camc2[i] = camc2[i] - camc1
+        return camc2, ids2
 
     class VideoGet:
         def __init__(self,src = 0):
