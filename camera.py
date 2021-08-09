@@ -16,6 +16,14 @@ class Camera:
         self.map = None
         self.video = self.VideoGet(cam_url)
 
+    def get_frame(self):
+        if self.video.stopped:
+            print('Cannot read frame')
+        else:
+            while self.video.frame is None:
+                continue
+            return self.video.frame
+
     def calibrated(self) -> bool:
         """ The property is equal true if the camera calibrated """
         return self._calibrated
@@ -37,7 +45,7 @@ class Camera:
         frame_id = 0
         tick = time.time()
         while True:
-            frame = self.video.frame
+            frame = self.get_frame()
             if self.video.stopped:
                 print('Cannot read from: ' + self.camera_url())
                 break
