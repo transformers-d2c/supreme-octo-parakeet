@@ -1,11 +1,9 @@
 import pickle
 import cv2
 from cv2 import aruco
-import numpy as np
-from pathlib import Path
-from typing import List, Tuple, Any
 import pickle
-
+import time
+from threading import Thread
 
 class Camera:
     """ The class implements the camera. """
@@ -25,7 +23,7 @@ class Camera:
     def camera_url(self):
         return self.cam_url
 
-    def undistort(self, img: Any):
+    def undistort(self, img):
         """ Returns undistorted image. Takes gray scaled image as an input. """
         if self.calibrated():
             return cv2.undistort(img, self.mtx, self.dist, None, self.mtx)
@@ -33,13 +31,14 @@ class Camera:
             return None
 
     def show_video(self, detectMarkers=False, showPoseAxis = False, showCharucoPose = False, showMapPose = False):
-        cap = cv2.VideoCapture(self.camera_url())
+        video_getter = self.VideoGet(self.camera_url()).start()
         aruco_dictionary = Camera._charuco_dict()
         print("Press q to Quit")
-
+        frame_id = 0
+        tick = time.time()
         while True:
-            ret, frame = cap.read()
-            if not ret:
+            frame = video_getter.frame
+            if video_getter.stopped:
                 print('Cannot read from: ' + self.camera_url())
                 break
             if detectMarkers:
@@ -59,9 +58,13 @@ class Camera:
                 if len(rvec)>0:
                     frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvec,tvec,30)
             cv2.imshow(self.camera_url(), frame)
+            frame_id = frame_id + 1
+            if frame_id%100==0:
+                print('fps: '+ str(100/(time.time()-tick)))
+                tick = time.time()
             if cv2.waitKey(1) == ord('q'):
                 break
-        cap.release()
+        video_getter.stop()
         cv2.destroyAllWindows()
 
     def calibrate_with_charuco(self, frame_rate=50, chess_square_length=1, marker_square_length=0.7, show_markers=True, save=None) -> None:
@@ -135,7 +138,7 @@ class Camera:
             self.map = aruco.GridBoard_create(data[0],data[1],data[2],data[3],Camera._charuco_dict())
 
     def _create_charuco_board(self, chess_square_length=1, marker_square_length=0.7):
-        return cv2.aruco.CharucoBoard_create(5, 5, chess_square_length, marker_square_length, Camera._charuco_dict())
+        return cv2.aruco.CharucoBoard_create(7, 5, chess_square_length, marker_square_length, Camera._charuco_dict())
 
     def save_charuco_board_to_file(self, filename):
         board = self._create_charuco_board()
@@ -196,3 +199,23 @@ class Camera:
             if ret>0:
                 return rvec,tvec
         return [],[]
+
+    class VideoGet:
+        def __init__(self,src = 0):
+            self.stream = cv2.VideoCapture(src)
+            (self.grabbed, self.frame) = self.stream.read()
+            self.stopped = False
+        
+        def start(self):
+            Thread(target=self.get, args=()).start()
+            return self
+
+        def get(self):
+            while not self.stopped:
+                if not self.grabbed:
+                    self.stop()
+                else:
+                    self.grabbed, self.frame = self.stream.read()
+
+        def stop(self):
+            self.stopped = True
