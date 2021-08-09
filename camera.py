@@ -14,7 +14,7 @@ class Camera:
         self._calibrated = False
         self.cam_url = cam_url
         self.map = None
-
+        self.video = self.VideoGet(cam_url)
 
     def calibrated(self) -> bool:
         """ The property is equal true if the camera calibrated """
@@ -31,14 +31,14 @@ class Camera:
             return None
 
     def show_video(self, detectMarkers=False, showPoseAxis = False, showCharucoPose = False, showMapPose = False):
-        video_getter = self.VideoGet(self.camera_url()).start()
+        self.video.start()
         aruco_dictionary = Camera._charuco_dict()
         print("Press q to Quit")
         frame_id = 0
         tick = time.time()
         while True:
-            frame = video_getter.frame
-            if video_getter.stopped:
+            frame = self.video.frame
+            if self.video.stopped:
                 print('Cannot read from: ' + self.camera_url())
                 break
             if detectMarkers:
@@ -64,7 +64,7 @@ class Camera:
                 tick = time.time()
             if cv2.waitKey(1) == ord('q'):
                 break
-        video_getter.stop()
+        self.video.stop()
         cv2.destroyAllWindows()
 
     def calibrate_with_charuco(self, frame_rate=50, chess_square_length=1, marker_square_length=0.7, show_markers=True, save=None) -> None:
@@ -202,20 +202,31 @@ class Camera:
 
     class VideoGet:
         def __init__(self,src = 0):
-            self.stream = cv2.VideoCapture(src)
-            (self.grabbed, self.frame) = self.stream.read()
-            self.stopped = False
+            self.grabbed = False
+            self.frame = None
+            self.stopped = True
+            self.thread = Thread(target=self.read_frame,args=())
+            self.video_stream = None
+            self.src = src
         
         def start(self):
-            Thread(target=self.get, args=()).start()
-            return self
-
-        def get(self):
+            if not self.stopped:
+                return
+            self.video_stream = cv2.VideoCapture(self.src)
+            if self.thread is None:
+                self.thread = Thread(target=self.read_frame,args=())
+            self.stopped = False
+            self.thread.start()
+        
+        def read_frame(self):
             while not self.stopped:
+                self.grabbed,self.frame = self.video_stream.read()
                 if not self.grabbed:
                     self.stop()
-                else:
-                    self.grabbed, self.frame = self.stream.read()
-
+                
         def stop(self):
             self.stopped = True
+            self.thread.join()
+            self.thread = None
+            self.video_stream.release()
+            self.video_stream = None
