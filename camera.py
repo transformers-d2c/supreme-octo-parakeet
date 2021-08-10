@@ -40,7 +40,8 @@ class Camera:
         else:
             return None
 
-    def show_video(self, detectMarkers=False, showPoseAxis = False, showCharucoPose = False, showMapPose = False):
+
+    def show_video(self, detectMarkers=False, showPoseAxis = False, showCharucoPose = False, showMapPose = False, helper=False):
         """
         Show video.
 
@@ -72,6 +73,15 @@ class Camera:
                 rvecs,tvecs = self.charuco_pose_in_camera_frame(frame)
                 if(len(rvecs)!=0):
                     frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvecs,tvecs,3)
+            if helper:
+                corners,ids1,_=aruco.detectMarkers(frame,aruco_dictionary)
+                camc,ids=self.cord_rel_to_marker(frame)
+                j=1
+                for t in ids:
+                    if t in ids1:
+                        j=ids1.index(t)
+                        break
+                frame=cv2.putText(frame,str(camc[0]),corners[0][0],cv2.FONT_HERSHEY_COMPLEX,1,(0,255,0),1)
             if showMapPose:
                 rvec,tvec = self.map_pose_in_camera_frame(frame,None,None,True)
                 if len(rvec)>0:
@@ -245,12 +255,17 @@ class Camera:
                 ids2.append((ids[i]))
         rmat1, _ = cv2.Rodrigues(r)
         camc1 = np.negative(np.matmul(np.linalg.inv(rmat1), t))
-        rmat2, _ = cv2.Rodrigues(rvec2)
-        camc2 = np.negative(np.matmul(np.linalg.inv(rmat2), tvec2))
+        camc2 = []
+        n = len(rvec2)
+        for i in range(n):
+            rmat2, _ = cv2.Rodrigues(rvec2[i])
+            camc2.append(np.negative(np.matmul(np.linalg.inv(rmat2), tvec2[i])))
         n = len(camc2)
         for i in range(n):
-            camc2[i] = camc2[i] - camc1
+            camc2[i] = np.subtract(camc2[i], camc1)
         return camc2, ids2
+
+
 
     class VideoGet:
         """
