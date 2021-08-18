@@ -1,7 +1,7 @@
 import camera as cam
-import numpy as np
+#import numpy as np
 
-url_input = str(input()) # takes the url as input, can be empty if wants the default '0' as camera
+url_input = str(input("Enter URL of the Camera (0 for default): ")) # takes the url as input, can be empty if wants the default '0' as camera
 global camera_url;
 global main_camera;  # this will be calibrated
 
@@ -12,9 +12,9 @@ else:
 
 main_camera = cam.Camera(camera_url);
 
-chess_sq_length = str(input())  # chess square length
-marker_sq_length = str(input()) # marker length
-saving_url = str(input()) # place to save the caloibration file
+chess_sq_length = float(input("Enter the Chess Square Length (must be a float value): "))  # chess square length
+marker_sq_length = float(input("Enter the Marker Square Length (must be a float value): ")) # marker length
+saving_url = str(input("Location of place to save the calibrated file: ")) # place to save the caloibration file
 
 main_camera.calibrate_with_charuco(50, chess_sq_length, marker_sq_length, True, saving_url);
 
