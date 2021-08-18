@@ -99,8 +99,7 @@ class Camera:
 
         cap = cv2.VideoCapture(self.camera_url())
         _dict = Camera._charuco_dict()
-        board = self._create_charuco_board(
-            chess_square_length, marker_square_length)
+        board = self._create_charuco_board(chess_square_length, marker_square_length)
         all_corners = []
         all_ids = []
 
