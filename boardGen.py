@@ -6,7 +6,7 @@ def main():
     round = int(input('Round?'))
     if round == 1:
         boardDict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_250)
-        board = cv2.aruco.GridBoard_create(20, 10, 1, 1/15.2400, boardDict)
+        board = cv2.aruco.GridBoard_create(20, 10, 15.2400, 1, boardDict)
         img = board.draw((4096, 4096), marginSize=20)
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         cv2.imwrite('board/round1/round_1_board.png', img)

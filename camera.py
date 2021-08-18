@@ -66,21 +66,25 @@ class Camera:
                 frame = aruco.drawDetectedMarkers(
                     frame, corners, ids, (0, 255, 0))
             if showPoseAxis and self.calibrated():
-                rvecs,tvecs,_ = self.marker_pose_in_camera_frame(frame,1)
+                rvecs,tvecs,_ = self.marker_pose_in_camera_frame(frame,None,None,60,True)
+                print(tvecs)
                 for rvec,tvec in zip(rvecs,tvecs):
-                    frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvec,tvec,1)
+                    frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvec,tvec,15)
             if showCharucoPose:
                 rvecs,tvecs = self.charuco_pose_in_camera_frame(frame)
                 if(len(rvecs)!=0):
                     frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvecs,tvecs,3)
             if showRobotPose:
                 corners,ids1,_=aruco.detectMarkers(frame,aruco_dictionary)
-                camc,ids=self.cord_rel_to_marker(frame)
+                camc,ids=self.cord_rel_to_marker(frame,63.96)
                 if len(camc)>0:
+                    # pass
+                    print("ROBO: ",end='')
                     print(camc[0])
                     #frame=cv2.putText(frame,str(camc[0]),corners[0][0],cv2.FONT_HERSHEY_COMPLEX,1,(0,255,0),1)
             if showMapPose:
                 rvec,tvec = self.map_pose_in_camera_frame(frame,None,None,True)
+                print(tvec)
                 if len(rvec)>0:
                     frame = aruco.drawAxis(frame,self.camera_matrix(),self.distortion_coeff(),rvec,tvec,30)
             cv2.imshow(self.camera_url(), frame)
@@ -184,7 +188,7 @@ class Camera:
             return None
         return self.dist
 
-    def marker_pose_in_camera_frame(self, frame, markerlength = 0.7):
+    def marker_pose_in_camera_frame(self, frame, corners, ids, markerlength = 0.7, useFrame = False):
         """
         Returns rvec and tvec for detected markers.
         """
@@ -194,7 +198,8 @@ class Camera:
             aruco_dictionary = Camera._charuco_dict()
             para = aruco.DetectorParameters_create()
             para.cornerRefinementMethod = aruco.CORNER_REFINE_SUBPIX
-            corners, ids, _ = aruco.detectMarkers(frame, aruco_dictionary,parameters = para)
+            if useFrame:
+                corners, ids, _ = aruco.detectMarkers(frame, aruco_dictionary,parameters = para)
             rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(
                 corners, markerlength, self.camera_matrix(), self.distortion_coeff())
             if rvec is None:
@@ -235,34 +240,40 @@ class Camera:
                 return rvec,tvec
         return [],[]
     
-    def cord_rel_to_marker(self, frame, markerlength=0.7):
+    def cord_rel_to_marker(self, frame, robotMarkerLength=0.7):
         corners, ids, _ = aruco.detectMarkers(frame, Camera._charuco_dict())
-        r, t = self.map_pose_in_camera_frame(frame, corners, ids)
-        if (r, t) == ([], []):
+        map_rvec, map_tvec = self.map_pose_in_camera_frame(frame, corners, ids)
+        if (map_rvec, map_tvec) == ([], []):
             return [], []
-        rvec, tvec, ids = self.marker_pose_in_camera_frame(frame, markerlength)
-        rvec2 = []
-        tvec2 = []
-        ids2 = []
+        rvecs, tvecs, ids = self.marker_pose_in_camera_frame(frame = frame,corners= corners, ids=ids,markerlength=robotMarkerLength)
+        robot_rvecs = []
+        robot_tvecs = []
+        robot_ids = []
         n = len(ids)
-        for i in range(n):
-            if ids[i] > 200:
-                rvec2.append(rvec[i])
-                tvec2.append(tvec[i])
-                ids2.append((ids[i]))
-        rmat1, _ = cv2.Rodrigues(r)
-        camc1 = np.negative(np.matmul(np.linalg.inv(rmat1), t))
-        camc2 = []
-        n = len(rvec2)
-        #print(tvec2)
-        #print(np.shape(tvec2))
-        for i in range(n):
-            rmat2, _ = cv2.Rodrigues(rvec2[i])
-            camc2.append(np.negative(np.matmul(np.linalg.inv(rmat2), np.transpose(tvec2[i]))))
-        n = len(camc2)
-        for i in range(n):
-            camc2[i] = np.subtract(camc2[i], camc1)
-        return camc2, ids2
+        for rvec,tvec,id in zip(rvecs,tvecs,ids):
+            if id>200:
+                robot_ids.append(id)
+                robot_rvecs.append(rvec)
+                robot_tvecs.append(tvec)
+        map_rotation_matrix, _ = cv2.Rodrigues(map_rvec)
+        print("MAP: ",end='')
+        print(map_tvec)
+        print("RTVEC: ",end='')
+        print(robot_tvecs)
+        
+        relative_robot_pose = []
+
+        for i in range(len(robot_ids)):
+            robot_rvecs[i] = np.transpose(robot_rvecs[i])
+            robot_tvecs[i] = np.transpose(robot_tvecs[i])
+            robot_rotation_matrix,_ = cv2.Rodrigues(robot_rvecs[i])
+            robot_rotation_matrix = np.transpose(robot_rotation_matrix)
+            robot_tvecs[i] = np.matmul(np.negative(robot_rotation_matrix),robot_tvecs[i])
+            robot_rvecs[i],_ = cv2.Rodrigues(robot_rotation_matrix)
+            rel_cord = cv2.composeRT(map_rvec,map_tvec,robot_rvecs[i],robot_tvecs[i])
+            relative_robot_pose.append((rel_cord[0],rel_cord[1]))            
+
+        return relative_robot_pose, robot_ids
 
 
 
