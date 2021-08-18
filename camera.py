@@ -255,6 +255,8 @@ class Camera:
         map_rvec, map_tvec = self.map_pose_in_camera_frame(frame, corners, ids)
         if (map_rvec, map_tvec) == ([], []):
             return [], []
+        map_tvec = np.array(map_tvec)
+        map_rvec = np.array(map_rvec)
         rvecs, tvecs, ids = self.marker_pose_in_camera_frame(frame = frame,corners= corners, ids=ids,markerlength=robotMarkerLength)
         robot_rvecs = []
         robot_tvecs = []
@@ -266,21 +268,15 @@ class Camera:
                 robot_rvecs.append(rvec)
                 robot_tvecs.append(tvec)
         map_rotation_matrix, _ = cv2.Rodrigues(map_rvec)
-        print("MAP: ",end='')
-        print(map_tvec)
-        print("RTVEC: ",end='')
-        print(robot_tvecs)
-        
+        map_rotation_matrix = np.transpose(map_rotation_matrix)
+        map_tvec = np.matmul(map_rotation_matrix,-map_tvec)
+        map_rvec, _ = cv2.Rodrigues(map_rotation_matrix)
         relative_robot_pose = []
 
         for i in range(len(robot_ids)):
             robot_rvecs[i] = np.transpose(robot_rvecs[i])
             robot_tvecs[i] = np.transpose(robot_tvecs[i])
-            robot_rotation_matrix,_ = cv2.Rodrigues(robot_rvecs[i])
-            robot_rotation_matrix = np.transpose(robot_rotation_matrix)
-            robot_tvecs[i] = np.matmul(np.negative(robot_rotation_matrix),robot_tvecs[i])
-            robot_rvecs[i],_ = cv2.Rodrigues(robot_rotation_matrix)
-            rel_cord = cv2.composeRT(map_rvec,map_tvec,robot_rvecs[i],robot_tvecs[i])
+            rel_cord = cv2.composeRT(robot_rvecs[i],robot_tvecs[i],map_rvec,map_tvec)
             relative_robot_pose.append((rel_cord[0],rel_cord[1]))
 
         relative_robot_pose_final = []
