@@ -6,6 +6,14 @@ import time
 from threading import Thread
 import numpy as np
 
+
+
+def rvectvec_to_euler(rvec,tvec):
+    rmat,_ = cv2.Rodrigues(rvec)
+    P = np.hstack((rmat,tvec))
+    return cv2.decomposeProjectionMatrix(P)[6]
+
+
 class Camera:
     """ The class implements the camera. """
 
@@ -240,6 +248,9 @@ class Camera:
         return [],[]
     
     def cord_rel_to_marker(self, frame, robotMarkerLength=0.7):
+        '''
+        Gives euler angles and tvec for any detected robots
+        '''
         corners, ids, _ = aruco.detectMarkers(frame, Camera._charuco_dict())
         map_rvec, map_tvec = self.map_pose_in_camera_frame(frame, corners, ids)
         if (map_rvec, map_tvec) == ([], []):
@@ -270,9 +281,14 @@ class Camera:
             robot_tvecs[i] = np.matmul(np.negative(robot_rotation_matrix),robot_tvecs[i])
             robot_rvecs[i],_ = cv2.Rodrigues(robot_rotation_matrix)
             rel_cord = cv2.composeRT(map_rvec,map_tvec,robot_rvecs[i],robot_tvecs[i])
-            relative_robot_pose.append((rel_cord[0],rel_cord[1]))            
+            relative_robot_pose.append((rel_cord[0],rel_cord[1]))
 
-        return relative_robot_pose, robot_ids
+        relative_robot_pose_final = []
+
+        for pose in relative_robot_pose:
+            relative_robot_pose_final.append((rvectvec_to_euler(pose[0],pose[1]),pose[1]))        
+
+        return relative_robot_pose_final, robot_ids
 
 
 
