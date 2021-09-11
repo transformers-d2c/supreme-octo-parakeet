@@ -73,6 +73,11 @@ class Camera:
                 corners, ids, _ = aruco.detectMarkers(frame, aruco_dictionary)
                 frame = aruco.drawDetectedMarkers(
                     frame, corners, ids, (0, 255, 0))
+                if ids is not None:
+                    for id in ids:
+                        if id>201:
+                            print(f'inside show_video {id}')
+                            cv2.imwrite('debugfile.jpg',frame)
             if showPoseAxis and self.calibrated():
                 rvecs,tvecs,_ = self.marker_pose_in_camera_frame(frame,None,None,60,True)
                 print(tvecs)
@@ -283,6 +288,9 @@ class Camera:
 
         for pose in relative_robot_pose:
             relative_robot_pose_final.append((rvectvec_to_euler(pose[0],pose[1]),pose[1]))        
+
+        if 226 in robot_ids:
+            print('YSYSYSYSY')
 
         return relative_robot_pose_final, robot_ids
 
